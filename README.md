@@ -38,7 +38,6 @@ Common options:
 npx @zerotrace-solutions/complaint-request-widget init \
   --target-dir . \
   --components-path src/components/ui \
-  --locale-root src/locales \
   --package-name @zerotrace-solutions/complaint-request-widget \
   --install
 ```
@@ -46,22 +45,22 @@ npx @zerotrace-solutions/complaint-request-widget init \
 The initializer is idempotent and non-destructive:
 
 - Creates `src/components/ui/complaint-widget.tsx` if missing.
-- Merges missing keys into:
-  - `src/locales/en/complaintRequrestWidget.json`
-  - `src/locales/ar/complaintRequrestWidget.json`
-- Preserves existing translation values.
+- Does not create locale JSON files.
+- Does not auto-edit your host i18n config file.
 - Detects missing recommended dependencies (`react`, `react-dom`, `tailwindcss`) and can install them.
 
 ## Usage
 
 ```tsx
 import { ComplaintRequestWidget } from "@zerotrace-solutions/complaint-request-widget";
+import i18n from "@/i18n";
 
 export function Page() {
   return (
     <ComplaintRequestWidget
       whatsappUrl="https://wa.me/201000000000"
       apiEndpoint="/api/complaints"
+      i18n={i18n}
       locale="en"
       direction="auto"
       side="auto"
@@ -69,6 +68,8 @@ export function Page() {
   );
 }
 ```
+
+When `i18n` is provided, the widget tracks the current client-side language from that instance and uses it for message fallback (`en`/`ar`) and payload metadata.
 
 Use a custom adapter when you need full transport control:
 
@@ -84,6 +85,87 @@ Use a custom adapter when you need full transport control:
   }}
 />
 ```
+
+## Endpoint Payload
+
+When `apiEndpoint` is used, the widget sends:
+
+- Method: `POST`
+- Header: `Content-Type: application/json`
+- Body: JSON object with this exact shape
+
+```ts
+type ComplaintPayload = {
+  body: string;
+  selectedElement: {
+    selector: string;
+    label: string;
+    tagName: string;
+    className: string;
+    textPreview: string;
+    rect: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+    pageUrl: string;
+  } | null;
+  page: {
+    title: string;
+    url: string;
+    language: string;
+    direction: "ltr" | "rtl";
+  };
+  createdAt: string; // ISO datetime
+};
+```
+
+Example payload:
+
+```json
+{
+  "body": "The submit button does not work",
+  "selectedElement": {
+    "selector": "button.btn.btn-primary:nth-of-type(2)",
+    "label": "Submit",
+    "tagName": "button",
+    "className": "btn btn-primary",
+    "textPreview": "Submit",
+    "rect": {
+      "x": 874,
+      "y": 642,
+      "width": 104,
+      "height": 40
+    },
+    "pageUrl": "https://example.com/checkout"
+  },
+  "page": {
+    "title": "Checkout",
+    "url": "https://example.com/checkout",
+    "language": "en",
+    "direction": "ltr"
+  },
+  "createdAt": "2026-03-23T10:24:13.001Z"
+}
+```
+
+Notes:
+
+- `selectedElement` is `null` when the user submits without selecting an element.
+- `body` is sanitized before sending and trimmed to a maximum of 4000 characters.
+
+Control panel size directly:
+
+```tsx
+<ComplaintRequestWidget
+  whatsappUrl="https://wa.me/201000000000"
+  panelWidth={420}
+  panelHeight={520}
+/>
+```
+
+`panelWidth` and `panelHeight` accept any React CSS size value (number, `px`, `%`, `vw`, etc.).
 
 ## Theming
 
@@ -116,6 +198,7 @@ import { defaultArMessages, defaultEnMessages, WIDGET_NAMESPACE } from "@zerotra
 Runtime localization options:
 
 - `locale` chooses default language template (`ar` uses Arabic defaults).
+- `i18n` lets the host pass its i18next instance directly; widget listens for `languageChanged`.
 - `messages` overrides selected keys.
 - `t(namespace, key, fallback)` plugs into host i18n function.
 

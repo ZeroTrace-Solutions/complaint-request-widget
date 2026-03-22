@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Bug, Send, X, Hand, Check } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
-import { WIDGET_NAMESPACE } from "./locales";
-import { DEFAULT_LABELS } from "./widget/defaultLabels";
+import { defaultArMessages, defaultEnMessages, WIDGET_NAMESPACE } from "./locales";
 import {
   buildElementReference,
   cn,
@@ -90,6 +89,10 @@ function mapPalette(colorScheme?: WidgetColorOverrides, colors?: WidgetColorOver
     "--crw-muted-foreground": merged.mutedForeground || "hsl(var(--muted-foreground))",
     "--crw-ring": merged.ring || "hsl(var(--ring))"
   } as React.CSSProperties;
+}
+
+function isArabicLanguage(language?: string): boolean {
+  return Boolean(language && /^ar(?:-|$)/i.test(language));
 }
 
 function Button({
@@ -179,56 +182,91 @@ export default function ComplaintRequestWidget({
   namespace,
   messages,
   t,
+  i18n: externalI18n,
   colors,
   zIndex,
   style,
+  panelWidth,
+  panelHeight,
   triggerIcon: _triggerIcon
 }: ComplaintRequestWidgetProps) {
   void _side;
   void _triggerIcon;
 
-  const { t: i18nT, i18n } = useTranslation(translationNamespace, { useSuspense: false });
+  const { i18n: hookI18n } = useTranslation(translationNamespace, { useSuspense: false });
+  const activeI18n = externalI18n ?? hookI18n;
+  const [, setLanguageTick] = useState(0);
 
-  const translatedLabels = useMemo(
-    () => ({
-      trigger: i18nT("trigger", { defaultValue: DEFAULT_LABELS.trigger }),
-      whatsapp: i18nT("whatsapp", { defaultValue: DEFAULT_LABELS.whatsapp }),
-      selectElement: i18nT("selectElement", { defaultValue: DEFAULT_LABELS.selectElement }),
-      writeComplaint: i18nT("writeComplaint", { defaultValue: DEFAULT_LABELS.writeComplaint }),
-      panelTitle: i18nT("panelTitle", { defaultValue: DEFAULT_LABELS.panelTitle }),
-      panelHint: i18nT("panelHint", { defaultValue: DEFAULT_LABELS.panelHint }),
-      selectedElement: i18nT("selectedElement", { defaultValue: DEFAULT_LABELS.selectedElement }),
-      noElementSelected: i18nT("noElementSelected", {
-        defaultValue: DEFAULT_LABELS.noElementSelected
-      }),
-      messagePlaceholder: i18nT("messagePlaceholder", {
-        defaultValue: DEFAULT_LABELS.messagePlaceholder
-      }),
-      submit: i18nT("submit", { defaultValue: DEFAULT_LABELS.submit }),
-      close: i18nT("close", { defaultValue: DEFAULT_LABELS.close }),
-      selecting: i18nT("selecting", { defaultValue: DEFAULT_LABELS.selecting }),
-      sent: i18nT("sent", { defaultValue: DEFAULT_LABELS.sent }),
-      sendError: i18nT("sendError", { defaultValue: DEFAULT_LABELS.sendError })
-    }),
-    [i18nT]
+  useEffect(() => {
+    if (!externalI18n) {
+      return;
+    }
+
+    const handleLanguageChanged = () => {
+      setLanguageTick((value) => value + 1);
+    };
+
+    externalI18n.on("languageChanged", handleLanguageChanged);
+    return () => {
+      externalI18n.off("languageChanged", handleLanguageChanged);
+    };
+  }, [externalI18n]);
+
+  const activeLanguage =
+    locale ||
+    activeI18n?.resolvedLanguage ||
+    activeI18n?.language ||
+    (typeof document !== "undefined" ? document.documentElement.lang : "") ||
+    "en";
+
+  const baseDefaultLabels = useMemo(
+    () => (isArabicLanguage(activeLanguage) ? defaultArMessages : defaultEnMessages),
+    [activeLanguage]
   );
 
-  const mappedMessages = useMemo(
-    () => ({
-      ...translatedLabels,
-      ...(messages || {})
-    }),
-    [messages, translatedLabels]
+  const translateWithI18n = useCallback(
+    (key: TranslationKey, fallback: string): string => {
+      if (!activeI18n) {
+        return fallback;
+      }
+
+      const resolved = activeI18n.t(key, {
+        ns: translationNamespace,
+        defaultValue: fallback
+      });
+
+      return typeof resolved === "string" ? resolved : fallback;
+    },
+    [activeI18n, translationNamespace]
   );
 
-  const mergedLabels = useMemo(
-    () => ({
-      ...DEFAULT_LABELS,
-      ...mappedMessages,
-      ...(labels || {})
-    }),
-    [labels, mappedMessages]
-  );
+  const translatedLabels = {
+    trigger: translateWithI18n("trigger", baseDefaultLabels.trigger),
+    whatsapp: translateWithI18n("whatsapp", baseDefaultLabels.whatsapp),
+    selectElement: translateWithI18n("selectElement", baseDefaultLabels.selectElement),
+    writeComplaint: translateWithI18n("writeComplaint", baseDefaultLabels.writeComplaint),
+    panelTitle: translateWithI18n("panelTitle", baseDefaultLabels.panelTitle),
+    panelHint: translateWithI18n("panelHint", baseDefaultLabels.panelHint),
+    selectedElement: translateWithI18n("selectedElement", baseDefaultLabels.selectedElement),
+    noElementSelected: translateWithI18n("noElementSelected", baseDefaultLabels.noElementSelected),
+    messagePlaceholder: translateWithI18n("messagePlaceholder", baseDefaultLabels.messagePlaceholder),
+    submit: translateWithI18n("submit", baseDefaultLabels.submit),
+    close: translateWithI18n("close", baseDefaultLabels.close),
+    selecting: translateWithI18n("selecting", baseDefaultLabels.selecting),
+    sent: translateWithI18n("sent", baseDefaultLabels.sent),
+    sendError: translateWithI18n("sendError", baseDefaultLabels.sendError)
+  };
+
+  const mappedMessages = {
+    ...translatedLabels,
+    ...(messages || {})
+  };
+
+  const mergedLabels = {
+    ...baseDefaultLabels,
+    ...mappedMessages,
+    ...(labels || {})
+  };
 
   const translateLabel = (key: TranslationKey): string => {
     const fallback = mergedLabels[key];
@@ -255,7 +293,7 @@ export default function ComplaintRequestWidget({
   const prevHtmlCursorRef = useRef("");
   const prevBodyCursorRef = useRef("");
 
-  const resolvedDirection = resolveDirection(direction, i18n?.dir?.());
+  const resolvedDirection = resolveDirection(direction, activeI18n?.dir?.());
   const resolvedSide = getSide(position, resolvedDirection);
   const cssVars = useMemo(() => mapPalette(colorScheme, colors), [colorScheme, colors]);
 
@@ -423,7 +461,7 @@ export default function ComplaintRequestWidget({
       page: {
         title: document.title,
         url: window.location.href,
-        language: locale || document.documentElement.lang,
+        language: activeLanguage,
         direction: (document.dir || resolvedDirection) as "ltr" | "rtl"
       },
       createdAt: new Date().toISOString()
@@ -483,11 +521,14 @@ export default function ComplaintRequestWidget({
         {isPanelOpen && (
           <motion.div
             className={cn(
-              "absolute bottom-16 w-[min(92vw,24rem)] rounded-2xl border p-4 shadow-xl backdrop-blur-md",
+              "absolute bottom-16 rounded-2xl border p-4 shadow-xl backdrop-blur-md",
               resolvedSide === "left" ? "left-0" : "right-0",
               panelClassName
             )}
             style={{
+              width: panelWidth ?? "min(92vw,24rem)",
+              maxWidth: "92vw",
+              height: panelHeight,
               backgroundColor: "color-mix(in oklab, var(--crw-surface) 92%, transparent)",
               borderColor: "var(--crw-border)",
               color: "var(--crw-surface-foreground)"

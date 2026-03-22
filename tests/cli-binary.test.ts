@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -10,6 +11,13 @@ const execFileAsync = promisify(execFile);
 describe("cli binary", () => {
   it("runs init command end-to-end from built binary", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "crw-cli-bin-"));
+    const npmExecPath = process.env.npm_execpath;
+    if (!npmExecPath) {
+      throw new Error("npm_execpath is required to build CLI test fixture");
+    }
+
+    await execFileAsync(process.execPath, [npmExecPath, "run", "build"], { cwd: process.cwd() });
+
     const cliPath = path.resolve(process.cwd(), "dist", "cli.cjs");
 
     await writeFile(
@@ -43,15 +51,13 @@ describe("cli binary", () => {
       path.join(root, "src", "components", "ui", "complaint-widget.tsx"),
       "utf8"
     );
-    const enLocale = JSON.parse(
-      await readFile(
-        path.join(root, "src", "locales", "en", "complaintRequrestWidget.json"),
-        "utf8"
-      )
-    ) as Record<string, string>;
 
     expect(component).toContain("ComplaintRequestWidget");
-    expect(enLocale.submit).toBeTruthy();
-    expect(enLocale.trigger).toBeTruthy();
-  });
+    expect(
+      existsSync(path.join(root, "src", "locales", "en", "complaintRequrestWidget.json"))
+    ).toBe(false);
+    expect(
+      existsSync(path.join(root, "src", "locales", "ar", "complaintRequrestWidget.json"))
+    ).toBe(false);
+  }, 30_000);
 });

@@ -1,5 +1,3 @@
-import { defaultArMessages, defaultEnMessages } from "../locales";
-
 export function componentTemplate(packageName: string) {
   return `"use client";
 
@@ -13,11 +11,3 @@ export function ComplaintWidget(props: ComplaintRequestWidgetProps) {
 }
 `;
 }
-
-export const localeTemplateEn = {
-  ...defaultEnMessages
-};
-
-export const localeTemplateAr = {
-  ...defaultArMessages
-};

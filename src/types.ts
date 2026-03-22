@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import type { i18n as I18n } from "i18next";
 
 export type WidgetDirection = "ltr" | "rtl" | "auto";
 export type WidgetSide = "left" | "right" | "auto";
@@ -92,8 +93,11 @@ export interface ComplaintRequestWidgetProps {
   namespace?: string;
   messages?: Partial<Record<TranslationKey, string>>;
   t?: (namespace: string, key: TranslationKey, defaultValue: string) => string;
+  i18n?: I18n;
   colors?: WidgetColorOverrides;
   zIndex?: number;
   style?: CSSProperties;
+  panelWidth?: CSSProperties["width"];
+  panelHeight?: CSSProperties["height"];
   triggerIcon?: ReactNode;
 }

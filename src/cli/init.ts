@@ -4,9 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { mergeMissingDeep } from "./jsonMerge";
-import { componentTemplate, localeTemplateAr, localeTemplateEn } from "./templates";
-import { WIDGET_NAMESPACE } from "../locales";
+import { componentTemplate } from "./templates";
 
 const RECOMMENDED_DEPENDENCIES = ["react", "react-dom", "tailwindcss"];
 
@@ -19,7 +17,6 @@ export interface InitOptions {
   install?: boolean;
   yes?: boolean;
   componentsPath?: string;
-  localeRoot?: string;
   packageName?: string;
 }
 
@@ -56,11 +53,6 @@ function validatePackageName(packageName: string): string {
     throw new Error(`Invalid package name: ${packageName}`);
   }
   return value;
-}
-
-async function writeJsonFile(filePath: string, value: Record<string, unknown>) {
-  await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
 async function writeIfMissing(filePath: string, content: string): Promise<"created" | "skipped"> {
@@ -151,21 +143,10 @@ export async function performInit(options: InitOptions = {}) {
     options.packageName ?? "@zerotrace-solutions/complaint-request-widget"
   );
   const componentsPath = options.componentsPath ?? "src/components/ui";
-  const localeRoot = options.localeRoot ?? "src/locales";
 
   const componentFile = path.join(resolveInsideRoot(rootDir, componentsPath), "complaint-widget.tsx");
-  const enFile = path.join(resolveInsideRoot(rootDir, localeRoot), "en", `${WIDGET_NAMESPACE}.json`);
-  const arFile = path.join(resolveInsideRoot(rootDir, localeRoot), "ar", `${WIDGET_NAMESPACE}.json`);
 
   const componentResult = await writeIfMissing(componentFile, componentTemplate(packageName));
-
-  const enCurrent = (await readJsonFile(enFile)) ?? {};
-  const arCurrent = (await readJsonFile(arFile)) ?? {};
-  const enMerged = mergeMissingDeep(enCurrent, localeTemplateEn);
-  const arMerged = mergeMissingDeep(arCurrent, localeTemplateAr);
-
-  await writeJsonFile(enFile, enMerged);
-  await writeJsonFile(arFile, arMerged);
 
   const manager = detectPackageManager(rootDir, options.packageManager);
   const missing = missingDependencies(packageJson);
@@ -178,8 +159,6 @@ export async function performInit(options: InitOptions = {}) {
   return {
     rootDir,
     componentFile,
-    enFile,
-    arFile,
     componentResult,
     installedDependencies: install ? missing : []
   };
