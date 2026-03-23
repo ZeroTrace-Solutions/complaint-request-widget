@@ -12,8 +12,7 @@ import {
   buildElementReference,
   cn,
   getElementLabel,
-  getRectBox,
-  getSide
+  getRectBox
 } from "./widget/helpers";
 import type {
   ComplaintRequestWidgetProps,
@@ -330,8 +329,34 @@ export default function ComplaintRequestWidget({
   const prevBodyCursorRef = useRef("");
 
   const resolvedDirection = resolveDirection(direction, activeI18n?.dir?.());
-  const resolvedSide = getSide(position, resolvedDirection);
+  const resolvedSide = resolvedDirection === "rtl" ? "left" : "right";
   const cssVars = useMemo(() => mapPalette(colorScheme, colors), [colorScheme, colors]);
+  const rootStyleWithoutPosition = useMemo(() => {
+    if (!style) {
+      return undefined;
+    }
+
+    const {
+      bottom: _bottom,
+      left: _left,
+      right: _right,
+      inset: _inset,
+      insetBlockEnd: _insetBlockEnd,
+      insetInlineStart: _insetInlineStart,
+      insetInlineEnd: _insetInlineEnd,
+      ...rest
+    } = style;
+
+    void _bottom;
+    void _left;
+    void _right;
+    void _inset;
+    void _insetBlockEnd;
+    void _insetInlineStart;
+    void _insetInlineEnd;
+
+    return rest;
+  }, [style]);
   const triggerButtonCssSize =
     triggerButtonSize === undefined
       ? "3rem"
@@ -346,12 +371,17 @@ export default function ComplaintRequestWidget({
     triggerIconSize === undefined ? undefined : { width: triggerIconSize, height: triggerIconSize };
   const actionIconStyle =
     actionIconSize === undefined ? undefined : { width: actionIconSize, height: actionIconSize };
-  const panelBottomOffset = "calc(var(--crw-trigger-button-size) + 0.75rem + env(safe-area-inset-bottom, 0px))";
+  const panelBottomOffset = "calc(var(--crw-trigger-button-size) + 1rem + env(safe-area-inset-bottom, 0px))";
   const panelMaxHeightFallback =
     "calc(100svh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - var(--crw-trigger-button-size) - 5.25rem)";
   const resolvedPanelMaxHeight = dynamicPanelMaxHeight
     ? `${dynamicPanelMaxHeight}px`
     : panelMaxHeightFallback;
+  const rootBottomOffset = "max(0.75rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem))";
+  const rootInlineOffset =
+    resolvedSide === "left"
+      ? "max(0.75rem, calc(env(safe-area-inset-left, 0px) + 0.5rem))"
+      : "max(0.75rem, calc(env(safe-area-inset-right, 0px) + 0.5rem))";
 
   const updatePanelMaxHeight = useCallback(() => {
     if (!isPanelOpen || !triggerRef.current) {
@@ -612,10 +642,16 @@ export default function ComplaintRequestWidget({
   return (
     <div
       ref={rootRef}
-      style={{ ...cssVars, ...style, zIndex, ["--crw-trigger-button-size" as string]: triggerButtonCssSize }}
+      style={{
+        ...cssVars,
+        ...rootStyleWithoutPosition,
+        zIndex,
+        ["--crw-trigger-button-size" as string]: triggerButtonCssSize,
+        bottom: rootBottomOffset,
+        ...(resolvedSide === "left" ? { left: rootInlineOffset } : { right: rootInlineOffset })
+      }}
       className={cn(
-        "fixed bottom-4 z-[80] h-0 w-0 overflow-visible sm:bottom-6",
-        resolvedSide === "left" ? "left-3 sm:left-6" : "right-3 sm:right-6",
+        "fixed z-[80] h-0 w-0 overflow-visible",
         className
       )}
       data-complaint-widget-root="true"
@@ -635,13 +671,14 @@ export default function ComplaintRequestWidget({
               maxWidth: panelWidth === undefined ? "92vw" : undefined,
               height: panelHeight ?? "auto",
               maxHeight: resolvedPanelMaxHeight,
+              transformOrigin: resolvedSide === "left" ? "left bottom" : "right bottom",
               backgroundColor: "color-mix(in oklab, var(--crw-surface) 92%, transparent)",
               borderColor: "var(--crw-border)",
               color: "var(--crw-surface-foreground)"
             }}
-            initial={{ opacity: 0, y: 12, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.96 }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
           >
             <div className="shrink-0">
