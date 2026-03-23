@@ -1,6 +1,6 @@
 {
   "name": "@zerotrace-solutions/complaint-request-widget",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Floating complaint and support widget for Tailwind + shadcn React apps.",
   "license": "MIT",
   "type": "module",
