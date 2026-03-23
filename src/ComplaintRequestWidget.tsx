@@ -198,6 +198,7 @@ export default function ComplaintRequestWidget({
   actionIconSize,
   triggerIcon: _triggerIcon
 }: ComplaintRequestWidgetProps) {
+  void position;
   void _side;
   void _triggerIcon;
 
