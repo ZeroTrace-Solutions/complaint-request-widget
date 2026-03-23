@@ -99,5 +99,9 @@ export interface ComplaintRequestWidgetProps {
   style?: CSSProperties;
   panelWidth?: CSSProperties["width"];
   panelHeight?: CSSProperties["height"];
+  triggerButtonSize?: CSSProperties["width"];
+  triggerIconSize?: CSSProperties["width"];
+  actionButtonSize?: CSSProperties["width"];
+  actionIconSize?: CSSProperties["width"];
   triggerIcon?: ReactNode;
 }

@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { componentTemplate } from "./templates";
+import { componentTemplate, type ComponentExtension } from "./templates";
 
 const RECOMMENDED_DEPENDENCIES = ["react", "react-dom", "tailwindcss"];
 
@@ -18,6 +18,7 @@ export interface InitOptions {
   yes?: boolean;
   componentsPath?: string;
   packageName?: string;
+  componentExt?: ComponentExtension;
 }
 
 async function readJsonFile(filePath: string): Promise<Record<string, unknown> | null> {
@@ -53,6 +54,19 @@ function validatePackageName(packageName: string): string {
     throw new Error(`Invalid package name: ${packageName}`);
   }
   return value;
+}
+
+function normalizeComponentExtension(value?: string): ComponentExtension | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "tsx" || normalized === "jsx") {
+    return normalized;
+  }
+
+  throw new Error(`Invalid component extension: ${value}. Use "tsx" or "jsx".`);
 }
 
 async function writeIfMissing(filePath: string, content: string): Promise<"created" | "skipped"> {
@@ -114,6 +128,33 @@ async function shouldInstall(missing: string[], yes = false, install = false): P
   return answer.trim().toLowerCase() === "y";
 }
 
+async function resolveComponentExtension(
+  provided?: ComponentExtension,
+  yes = false
+): Promise<ComponentExtension> {
+  if (provided) {
+    return provided;
+  }
+
+  if (yes) {
+    return "tsx";
+  }
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await rl.question("Generate wrapper as TSX or JSX? (tsx/JSX, default: tsx): ");
+  rl.close();
+
+  const normalized = answer.trim().toLowerCase();
+  if (!normalized) {
+    return "tsx";
+  }
+  if (normalized === "tsx" || normalized === "jsx") {
+    return normalized;
+  }
+
+  throw new Error(`Invalid component extension: ${answer}. Use "tsx" or "jsx".`);
+}
+
 function installDependencies(rootDir: string, manager: PackageManager, deps: string[]) {
   if (!deps.length) {
     return;
@@ -143,10 +184,12 @@ export async function performInit(options: InitOptions = {}) {
     options.packageName ?? "@zerotrace-solutions/complaint-request-widget"
   );
   const componentsPath = options.componentsPath ?? "src/components/ui";
+  const requestedComponentExt = normalizeComponentExtension(options.componentExt);
+  const componentExt = await resolveComponentExtension(requestedComponentExt ?? undefined, options.yes);
 
-  const componentFile = path.join(resolveInsideRoot(rootDir, componentsPath), "complaint-widget.tsx");
+  const componentFile = path.join(resolveInsideRoot(rootDir, componentsPath), `complaint-widget.${componentExt}`);
 
-  const componentResult = await writeIfMissing(componentFile, componentTemplate(packageName));
+  const componentResult = await writeIfMissing(componentFile, componentTemplate(packageName, componentExt));
 
   const manager = detectPackageManager(rootDir, options.packageManager);
   const missing = missingDependencies(packageJson);
@@ -159,6 +202,7 @@ export async function performInit(options: InitOptions = {}) {
   return {
     rootDir,
     componentFile,
+    componentExt,
     componentResult,
     installedDependencies: install ? missing : []
   };

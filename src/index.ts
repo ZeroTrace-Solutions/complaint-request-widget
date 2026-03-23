@@ -1,5 +1,10 @@
 export { ComplaintRequestWidget } from "./ComplaintRequestWidget";
-export { WIDGET_NAMESPACE, defaultArMessages, defaultEnMessages } from "./locales";
+export {
+  LEGACY_WIDGET_NAMESPACE,
+  WIDGET_NAMESPACE,
+  defaultArMessages,
+  defaultEnMessages
+} from "./locales";
 export type {
   ComplaintPayload,
   ComplaintRequestWidgetProps,

@@ -16,6 +16,7 @@ program
   .option("-y, --yes", "Accept prompts with defaults")
   .option("--components-path <path>", "Path for generated component")
   .option("--package-name <name>", "Library package name used in generated import")
+  .option("--component-ext <ext>", "Generated wrapper extension: tsx | jsx")
   .action(async (options) => {
     const result = await performInit({
       targetDir: options.targetDir,
@@ -23,7 +24,8 @@ program
       install: options.install,
       yes: options.yes,
       componentsPath: options.componentsPath,
-      packageName: options.packageName
+      packageName: options.packageName,
+      componentExt: options.componentExt
     });
 
     console.log("Init complete.");

@@ -1,6 +1,7 @@
 import type { TranslationKey } from "./types";
 
-export const WIDGET_NAMESPACE = "complaintRequrestWidget";
+export const LEGACY_WIDGET_NAMESPACE = "complaintRequrestWidget";
+export const WIDGET_NAMESPACE = "complaintRequestWidget";
 
 export const defaultEnMessages: Record<TranslationKey, string> = {
   trigger: "Report an issue",

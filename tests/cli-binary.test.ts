@@ -43,12 +43,14 @@ describe("cli binary", () => {
       "--target-dir",
       root,
       "--yes",
+      "--component-ext",
+      "jsx",
       "--package-name",
       "@zerotrace-solutions/complaint-request-widget"
     ]);
 
     const component = await readFile(
-      path.join(root, "src", "components", "ui", "complaint-widget.tsx"),
+      path.join(root, "src", "components", "ui", "complaint-widget.jsx"),
       "utf8"
     );
 

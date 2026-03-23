@@ -9,7 +9,7 @@ Production-ready React complaint widget library for Tailwind + shadcn hosts.
 - Selection mode that targets arbitrary DOM elements without mutating target styles.
 - Metadata-rich complaint payloads (selector, label, rect, URL, lang, direction, timestamp).
 - Configurable API endpoint or custom request adapter.
-- i18n namespace `complaintRequrestWidget` with default `en` and `ar` templates.
+- i18n namespace `complaintRequestWidget` with default `en` and `ar` templates.
 - Safe `init` CLI (no postinstall source mutation).
 
 ## Install
@@ -38,13 +38,14 @@ Common options:
 npx @zerotrace-solutions/complaint-request-widget init \
   --target-dir . \
   --components-path src/components/ui \
+  --component-ext tsx \
   --package-name @zerotrace-solutions/complaint-request-widget \
   --install
 ```
 
 The initializer is idempotent and non-destructive:
 
-- Creates `src/components/ui/complaint-widget.tsx` if missing.
+- Creates `src/components/ui/complaint-widget.tsx` by default, or `.jsx` when `--component-ext jsx` is used.
 - Does not create locale JSON files.
 - Does not auto-edit your host i18n config file.
 - Detects missing recommended dependencies (`react`, `react-dom`, `tailwindcss`) and can install them.
@@ -167,6 +168,23 @@ Control panel size directly:
 
 `panelWidth` and `panelHeight` accept any React CSS size value (number, `px`, `%`, `vw`, etc.).
 
+Control launcher and action icon sizes:
+
+```tsx
+<ComplaintRequestWidget
+  whatsappUrl="https://wa.me/201000000000"
+  triggerButtonSize={64}
+  triggerIconSize={28}
+  actionButtonSize={52}
+  actionIconSize={22}
+/>
+```
+
+- `triggerButtonSize`: main floating launcher button width/height
+- `triggerIconSize`: icon inside the main launcher button
+- `actionButtonSize`: width/height of WhatsApp, select, and complaint action buttons
+- `actionIconSize`: icons inside those action buttons
+
 ## Theming
 
 The widget inherits host tokens by default with CSS variable fallbacks.
@@ -187,7 +205,9 @@ Override per instance using `colors`:
 
 ## i18n
 
-Namespace: `complaintRequrestWidget`
+Namespace: `complaintRequestWidget`
+
+Backward compatibility: the widget also resolves the legacy typo namespace `complaintRequrestWidget`.
 
 Default locale templates exported from package:
 

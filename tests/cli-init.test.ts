@@ -43,6 +43,23 @@ describe("performInit", () => {
     ).toBe(false);
   });
 
+  it("creates jsx component when requested", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "crw-init-jsx-"));
+
+    await writeFile(
+      path.join(root, "package.json"),
+      JSON.stringify({ name: "host-app", version: "1.0.0" }, null, 2)
+    );
+
+    const result = await performInit({ targetDir: root, yes: true, componentExt: "jsx" });
+    const component = await readFile(result.componentFile, "utf8");
+
+    expect(result.componentExt).toBe("jsx");
+    expect(result.componentFile.endsWith("complaint-widget.jsx")).toBe(true);
+    expect(component).toContain("import { ComplaintRequestWidget }");
+    expect(component).not.toContain("type ComplaintRequestWidgetProps");
+  });
+
   it("rejects path traversal and invalid package names", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "crw-init-sec-"));
 
@@ -66,6 +83,14 @@ describe("performInit", () => {
         packageName: "bad package name"
       })
     ).rejects.toThrow(/invalid package name/i);
+
+    await expect(
+      performInit({
+        targetDir: root,
+        yes: true,
+        componentExt: "ts" as never
+      })
+    ).rejects.toThrow(/invalid component extension/i);
   });
 
   it("does not patch host i18n files", async () => {

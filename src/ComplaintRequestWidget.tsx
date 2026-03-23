@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { MessageCircle, Bug, Send, X, Hand, Check } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
-import { defaultArMessages, defaultEnMessages, WIDGET_NAMESPACE } from "./locales";
+import {
+  defaultArMessages,
+  defaultEnMessages,
+  LEGACY_WIDGET_NAMESPACE,
+  WIDGET_NAMESPACE
+} from "./locales";
 import {
   buildElementReference,
   cn,
@@ -188,12 +193,24 @@ export default function ComplaintRequestWidget({
   style,
   panelWidth,
   panelHeight,
+  triggerButtonSize,
+  triggerIconSize,
+  actionButtonSize,
+  actionIconSize,
   triggerIcon: _triggerIcon
 }: ComplaintRequestWidgetProps) {
   void _side;
   void _triggerIcon;
 
-  const { i18n: hookI18n } = useTranslation(translationNamespace, { useSuspense: false });
+  const translationNamespaces = useMemo(() => {
+    const namespaces = [translationNamespace];
+    if (translationNamespace === WIDGET_NAMESPACE) {
+      namespaces.push(LEGACY_WIDGET_NAMESPACE);
+    }
+    return Array.from(new Set(namespaces));
+  }, [translationNamespace]);
+
+  const { i18n: hookI18n } = useTranslation(translationNamespaces, { useSuspense: false });
   const activeI18n = externalI18n ?? hookI18n;
   const [, setLanguageTick] = useState(0);
 
@@ -230,14 +247,31 @@ export default function ComplaintRequestWidget({
         return fallback;
       }
 
+      const hasExists = typeof activeI18n.exists === "function";
+      const hasTranslate = typeof activeI18n.t === "function";
+      if (!hasTranslate) {
+        return fallback;
+      }
+
+      for (const ns of translationNamespaces) {
+        if (!hasExists || activeI18n.exists(key, { ns })) {
+          const resolved = activeI18n.t(key, {
+            ns,
+            defaultValue: fallback
+          });
+
+          return typeof resolved === "string" ? resolved : fallback;
+        }
+      }
+
       const resolved = activeI18n.t(key, {
-        ns: translationNamespace,
+        ns: translationNamespaces[0],
         defaultValue: fallback
       });
 
       return typeof resolved === "string" ? resolved : fallback;
     },
-    [activeI18n, translationNamespace]
+    [activeI18n, translationNamespaces]
   );
 
   const translatedLabels = {
@@ -273,7 +307,7 @@ export default function ComplaintRequestWidget({
     if (!t) {
       return fallback;
     }
-    return t(namespace || translationNamespace, key, fallback);
+    return t(namespace || translationNamespaces[0] || WIDGET_NAMESPACE, key, fallback);
   };
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -296,6 +330,14 @@ export default function ComplaintRequestWidget({
   const resolvedDirection = resolveDirection(direction, activeI18n?.dir?.());
   const resolvedSide = getSide(position, resolvedDirection);
   const cssVars = useMemo(() => mapPalette(colorScheme, colors), [colorScheme, colors]);
+  const triggerButtonStyle =
+    triggerButtonSize === undefined ? undefined : { width: triggerButtonSize, height: triggerButtonSize };
+  const actionButtonStyle =
+    actionButtonSize === undefined ? undefined : { width: actionButtonSize, height: actionButtonSize };
+  const triggerIconStyle =
+    triggerIconSize === undefined ? undefined : { width: triggerIconSize, height: triggerIconSize };
+  const actionIconStyle =
+    actionIconSize === undefined ? undefined : { width: actionIconSize, height: actionIconSize };
 
   const highlightAndScrollTo = (node: Element | null): boolean => {
     if (!(node instanceof HTMLElement)) {
@@ -521,13 +563,13 @@ export default function ComplaintRequestWidget({
         {isPanelOpen && (
           <motion.div
             className={cn(
-              "absolute bottom-16 rounded-2xl border p-4 shadow-xl backdrop-blur-md",
+              "absolute bottom-16 flex flex-col rounded-2xl border p-4 shadow-xl backdrop-blur-md",
               resolvedSide === "left" ? "left-0" : "right-0",
               panelClassName
             )}
             style={{
               width: panelWidth ?? "min(92vw,24rem)",
-              maxWidth: "92vw",
+              maxWidth: panelWidth === undefined ? "92vw" : undefined,
               height: panelHeight,
               backgroundColor: "color-mix(in oklab, var(--crw-surface) 92%, transparent)",
               borderColor: "var(--crw-border)",
@@ -604,8 +646,9 @@ export default function ComplaintRequestWidget({
               onChange={(event) => setMessage(event.target.value)}
               rows={4}
               placeholder={translateLabel("messagePlaceholder")}
-              className="w-full resize-y rounded-xl border p-2 text-sm outline-none"
+              className="w-full flex-1 resize-y rounded-xl border p-2 text-sm outline-none"
               style={{
+                minHeight: 96,
                 borderColor: "var(--crw-border)",
                 backgroundColor: "color-mix(in oklab, var(--crw-surface) 84%, transparent)"
               }}
@@ -671,6 +714,7 @@ export default function ComplaintRequestWidget({
             size="icon"
             className={cn("rounded-full shadow-lg cursor-pointer", buttonClassName)}
             style={{
+              ...actionButtonStyle,
               backgroundColor: "var(--crw-surface)",
               color: "var(--crw-surface-foreground)",
               border: "1px solid var(--crw-border)"
@@ -688,7 +732,7 @@ export default function ComplaintRequestWidget({
                 }
               }}
             >
-              <MessageCircle className="size-5" />
+              <MessageCircle className="size-5" style={actionIconStyle} />
             </a>
           </Button>
         </motion.div>
@@ -703,13 +747,14 @@ export default function ComplaintRequestWidget({
             }}
             className={cn("rounded-full shadow-lg cursor-pointer", buttonClassName)}
             style={{
+              ...actionButtonStyle,
               backgroundColor: "var(--crw-surface)",
               color: "var(--crw-surface-foreground)",
               border: "1px solid var(--crw-border)"
             }}
             title={translateLabel("selectElement")}
           >
-            <Hand className="size-5" />
+            <Hand className="size-5" style={actionIconStyle} />
           </Button>
         </motion.div>
 
@@ -722,13 +767,14 @@ export default function ComplaintRequestWidget({
             }}
             className={cn("rounded-full shadow-lg cursor-pointer", buttonClassName)}
             style={{
+              ...actionButtonStyle,
               backgroundColor: "var(--crw-surface)",
               color: "var(--crw-surface-foreground)",
               border: "1px solid var(--crw-border)"
             }}
             title={translateLabel("writeComplaint")}
           >
-            <Bug className="size-5" />
+            <Bug className="size-5" style={actionIconStyle} />
           </Button>
         </motion.div>
       </motion.div>
@@ -857,13 +903,18 @@ export default function ComplaintRequestWidget({
           }}
           className={cn("rounded-full shadow-xl cursor-pointer", buttonClassName)}
           style={{
+            ...triggerButtonStyle,
             backgroundColor: "var(--crw-primary)",
             color: "var(--crw-primary-foreground)",
             boxShadow: "0 10px 25px color-mix(in oklab, var(--crw-primary) 30%, transparent)"
           }}
           title={translateLabel("trigger")}
         >
-          {isMenuOpen ? <X className="size-5" /> : <MessageCircle className="size-5" />}
+          {isMenuOpen ? (
+            <X className="size-5" style={triggerIconStyle} />
+          ) : (
+            <MessageCircle className="size-5" style={triggerIconStyle} />
+          )}
         </Button>
       </motion.div>
     </div>
