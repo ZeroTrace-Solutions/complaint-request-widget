@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { ComplaintRequestWidget } from "@zerotrace-solutions/complaint-request-widget";
+import "./theme.css";
 
 function App() {
   return (

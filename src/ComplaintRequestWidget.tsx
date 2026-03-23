@@ -321,8 +321,10 @@ export default function ComplaintRequestWidget({
   const [isPreviewingSelected, setIsPreviewingSelected] = useState(false);
   const [status, setStatus] = useState<StatusState>({ type: "idle", text: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dynamicPanelMaxHeight, setDynamicPanelMaxHeight] = useState<number | null>(null);
 
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLDivElement | null>(null);
   const hoveredElementRef = useRef<HTMLElement | null>(null);
   const prevHtmlCursorRef = useRef("");
   const prevBodyCursorRef = useRef("");
@@ -330,6 +332,12 @@ export default function ComplaintRequestWidget({
   const resolvedDirection = resolveDirection(direction, activeI18n?.dir?.());
   const resolvedSide = getSide(position, resolvedDirection);
   const cssVars = useMemo(() => mapPalette(colorScheme, colors), [colorScheme, colors]);
+  const triggerButtonCssSize =
+    triggerButtonSize === undefined
+      ? "3rem"
+      : typeof triggerButtonSize === "number"
+        ? `${triggerButtonSize}px`
+        : String(triggerButtonSize);
   const triggerButtonStyle =
     triggerButtonSize === undefined ? undefined : { width: triggerButtonSize, height: triggerButtonSize };
   const actionButtonStyle =
@@ -338,6 +346,60 @@ export default function ComplaintRequestWidget({
     triggerIconSize === undefined ? undefined : { width: triggerIconSize, height: triggerIconSize };
   const actionIconStyle =
     actionIconSize === undefined ? undefined : { width: actionIconSize, height: actionIconSize };
+  const panelBottomOffset = "calc(var(--crw-trigger-button-size) + 0.75rem + env(safe-area-inset-bottom, 0px))";
+  const panelMaxHeightFallback =
+    "calc(100svh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - var(--crw-trigger-button-size) - 5.25rem)";
+  const resolvedPanelMaxHeight = dynamicPanelMaxHeight
+    ? `${dynamicPanelMaxHeight}px`
+    : panelMaxHeightFallback;
+
+  const updatePanelMaxHeight = useCallback(() => {
+    if (!isPanelOpen || !triggerRef.current) {
+      return;
+    }
+
+    const triggerRect = triggerRef.current.getBoundingClientRect();
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    const viewportTop = window.visualViewport?.offsetTop ?? 0;
+    const availableAboveTrigger = triggerRect.top - viewportTop - 16;
+    const fallbackCap = viewportHeight - 128;
+    const nextMaxHeight = Math.max(220, Math.floor(Math.min(availableAboveTrigger, fallbackCap)));
+
+    setDynamicPanelMaxHeight(nextMaxHeight);
+  }, [isPanelOpen]);
+
+  useEffect(() => {
+    if (!isPanelOpen) {
+      return;
+    }
+
+    const onViewportChange = () => {
+      updatePanelMaxHeight();
+    };
+
+    updatePanelMaxHeight();
+
+    window.addEventListener("resize", onViewportChange);
+    window.addEventListener("orientationchange", onViewportChange);
+    window.addEventListener("scroll", onViewportChange, true);
+    const visualViewport = window.visualViewport;
+    visualViewport?.addEventListener("resize", onViewportChange);
+    visualViewport?.addEventListener("scroll", onViewportChange);
+
+    return () => {
+      window.removeEventListener("resize", onViewportChange);
+      window.removeEventListener("orientationchange", onViewportChange);
+      window.removeEventListener("scroll", onViewportChange, true);
+      visualViewport?.removeEventListener("resize", onViewportChange);
+      visualViewport?.removeEventListener("scroll", onViewportChange);
+    };
+  }, [isPanelOpen, updatePanelMaxHeight]);
+
+  useEffect(() => {
+    if (!isPanelOpen) {
+      setDynamicPanelMaxHeight(null);
+    }
+  }, [isPanelOpen]);
 
   const highlightAndScrollTo = (node: Element | null): boolean => {
     if (!(node instanceof HTMLElement)) {
@@ -550,9 +612,9 @@ export default function ComplaintRequestWidget({
   return (
     <div
       ref={rootRef}
-      style={{ ...cssVars, ...style, zIndex }}
+      style={{ ...cssVars, ...style, zIndex, ["--crw-trigger-button-size" as string]: triggerButtonCssSize }}
       className={cn(
-        "fixed bottom-4 z-[80] sm:bottom-6",
+        "fixed bottom-4 z-[80] h-0 w-0 overflow-visible sm:bottom-6",
         resolvedSide === "left" ? "left-3 sm:left-6" : "right-3 sm:right-6",
         className
       )}
@@ -563,14 +625,16 @@ export default function ComplaintRequestWidget({
         {isPanelOpen && (
           <motion.div
             className={cn(
-              "absolute bottom-16 flex flex-col rounded-2xl border p-4 shadow-xl backdrop-blur-md",
+              "absolute flex flex-col overflow-hidden rounded-2xl border p-4 shadow-xl backdrop-blur-md",
               resolvedSide === "left" ? "left-0" : "right-0",
               panelClassName
             )}
             style={{
+              bottom: panelBottomOffset,
               width: panelWidth ?? "min(92vw,24rem)",
               maxWidth: panelWidth === undefined ? "92vw" : undefined,
-              height: panelHeight,
+              height: panelHeight ?? "auto",
+              maxHeight: resolvedPanelMaxHeight,
               backgroundColor: "color-mix(in oklab, var(--crw-surface) 92%, transparent)",
               borderColor: "var(--crw-border)",
               color: "var(--crw-surface-foreground)"
@@ -580,127 +644,135 @@ export default function ComplaintRequestWidget({
             exit={{ opacity: 0, y: 10, scale: 0.96 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
           >
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold">{translateLabel("panelTitle")}</h3>
-                <p className="mt-1 text-xs" style={{ color: "var(--crw-muted-foreground)" }}>
-                  {translateLabel("panelHint")}
-                </p>
+            <div className="shrink-0">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold">{translateLabel("panelTitle")}</h3>
+                  <p className="mt-1 text-xs" style={{ color: "var(--crw-muted-foreground)" }}>
+                    {translateLabel("panelHint")}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setIsPanelOpen(false)}
+                  aria-label={translateLabel("close")}
+                  className="cursor-pointer"
+                >
+                  <X className="size-4" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setIsPanelOpen(false)}
-                aria-label={translateLabel("close")}
-                className="cursor-pointer"
-              >
-                <X className="size-4" />
-              </Button>
-            </div>
 
-            <div
-              className={cn(
-                "mb-3 rounded-xl border p-2 text-xs",
-                selectedElement ? "cursor-pointer transition-colors hover:bg-muted/40" : ""
-              )}
-              style={{
-                borderColor: "var(--crw-border)",
-                backgroundColor: "color-mix(in oklab, var(--crw-muted) 40%, transparent)"
-              }}
-              onMouseEnter={() => {
-                if (selectedElement) {
-                  setIsPreviewingSelected(true);
-                }
-              }}
-              onMouseLeave={() => setIsPreviewingSelected(false)}
-              onClick={() => {
-                void handleGoToSelected();
-              }}
-              role={selectedElement ? "button" : undefined}
-              tabIndex={selectedElement ? 0 : undefined}
-              onKeyDown={(event) => {
-                if (!selectedElement) {
-                  return;
-                }
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  void handleGoToSelected();
-                }
-              }}
-              title={selectedElement ? "Go to selected component" : undefined}
-            >
-              <p className="mb-1 font-medium">{translateLabel("selectedElement")}</p>
-              {selectedElement ? (
-                <p className="line-clamp-2" style={{ color: "var(--crw-muted-foreground)" }}>
-                  {selectedElement.label} ({selectedElement.selector || selectedElement.tagName})
-                </p>
-              ) : (
-                <p style={{ color: "var(--crw-muted-foreground)" }}>
-                  {translateLabel("noElementSelected")}
-                </p>
-              )}
-            </div>
-
-            <textarea
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              rows={4}
-              placeholder={translateLabel("messagePlaceholder")}
-              className="w-full flex-1 resize-y rounded-xl border p-2 text-sm outline-none"
-              style={{
-                minHeight: 96,
-                borderColor: "var(--crw-border)",
-                backgroundColor: "color-mix(in oklab, var(--crw-surface) 84%, transparent)"
-              }}
-            />
-
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setIsSelecting(true);
-                  setIsPanelOpen(false);
-                }}
-                className="cursor-pointer"
-              >
-                <Hand className="size-4" />
-                {translateLabel("selectElement")}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => {
-                  void handleSubmit();
-                }}
-                disabled={isSubmitting || !message.trim()}
-                className="cursor-pointer"
-              >
-                <Send className="size-4" />
-                {isSubmitting ? "..." : translateLabel("submit")}
-              </Button>
-            </div>
-
-            {status.text && (
-              <p
+              <div
                 className={cn(
-                  "mt-2 text-xs",
-                  status.type === "error" ? "text-destructive" : "text-emerald-600"
+                  "mb-3 rounded-xl border p-2 text-xs",
+                  selectedElement ? "cursor-pointer transition-colors hover:bg-muted/40" : ""
                 )}
+                style={{
+                  borderColor: "var(--crw-border)",
+                  backgroundColor: "color-mix(in oklab, var(--crw-muted) 40%, transparent)"
+                }}
+                onMouseEnter={() => {
+                  if (selectedElement) {
+                    setIsPreviewingSelected(true);
+                  }
+                }}
+                onMouseLeave={() => setIsPreviewingSelected(false)}
+                onClick={() => {
+                  void handleGoToSelected();
+                }}
+                role={selectedElement ? "button" : undefined}
+                tabIndex={selectedElement ? 0 : undefined}
+                onKeyDown={(event) => {
+                  if (!selectedElement) {
+                    return;
+                  }
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    void handleGoToSelected();
+                  }
+                }}
+                title={selectedElement ? "Go to selected component" : undefined}
               >
-                {status.text}
-              </p>
-            )}
+                <p className="mb-1 font-medium">{translateLabel("selectedElement")}</p>
+                {selectedElement ? (
+                  <p className="line-clamp-2" style={{ color: "var(--crw-muted-foreground)" }}>
+                    {selectedElement.label} ({selectedElement.selector || selectedElement.tagName})
+                  </p>
+                ) : (
+                  <p style={{ color: "var(--crw-muted-foreground)" }}>
+                    {translateLabel("noElementSelected")}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto pb-1">
+              <textarea
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                rows={4}
+                placeholder={translateLabel("messagePlaceholder")}
+                className="w-full resize-y rounded-xl border p-2 text-sm outline-none"
+                style={{
+                  minHeight: "clamp(5rem, 18vh, 9rem)",
+                  borderColor: "var(--crw-border)",
+                  backgroundColor: "color-mix(in oklab, var(--crw-surface) 84%, transparent)"
+                }}
+              />
+            </div>
+
+            <div className="mt-3 shrink-0">
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsSelecting(true);
+                    setIsPanelOpen(false);
+                  }}
+                  className="cursor-pointer"
+                >
+                  <Hand className="size-4" />
+                  {translateLabel("selectElement")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    void handleSubmit();
+                  }}
+                  disabled={isSubmitting || !message.trim()}
+                  className="cursor-pointer"
+                >
+                  <Send className="size-4" />
+                  {isSubmitting ? "..." : translateLabel("submit")}
+                </Button>
+              </div>
+
+              {status.text && (
+                <p
+                  className={cn(
+                    "mt-2 text-xs",
+                    status.type === "error" ? "text-destructive" : "text-emerald-600"
+                  )}
+                >
+                  {status.text}
+                </p>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <motion.div
         className={cn(
-          "mb-3 flex flex-col gap-2 transition-all",
+          "absolute flex flex-col gap-2 overflow-visible transition-all",
+          resolvedSide === "left" ? "left-0" : "right-0",
           isMenuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
         )}
+        style={{ bottom: panelBottomOffset }}
         initial={false}
         animate={isMenuOpen ? "open" : "closed"}
         variants={{
@@ -849,7 +921,8 @@ export default function ComplaintRequestWidget({
         {isSelecting && (
           <motion.div
             className={cn(
-              "mb-2 max-w-56 rounded-xl border px-3 py-2 text-xs shadow-lg",
+              "absolute max-w-56 rounded-xl border px-3 py-2 text-xs shadow-lg",
+              "bottom-[calc(var(--crw-trigger-button-size)+0.5rem+env(safe-area-inset-bottom,0px))]",
               resolvedSide === "left" ? "text-left" : "text-right"
             )}
             style={{
@@ -870,7 +943,11 @@ export default function ComplaintRequestWidget({
       <AnimatePresence>
         {!isSelecting && status.type === "success" && status.text && (
           <motion.div
-            className="mb-2 flex items-center gap-1 rounded-xl border px-3 py-2 text-xs shadow-lg"
+            className={cn(
+              "absolute flex items-center gap-1 rounded-xl border px-3 py-2 text-xs shadow-lg",
+              "bottom-[calc(var(--crw-trigger-button-size)+0.5rem+env(safe-area-inset-bottom,0px))]",
+              resolvedSide === "left" ? "left-0" : "right-0"
+            )}
             style={{
               backgroundColor: "var(--crw-surface)",
               borderColor: "var(--crw-border)",
@@ -888,6 +965,8 @@ export default function ComplaintRequestWidget({
       </AnimatePresence>
 
       <motion.div
+        ref={triggerRef}
+        className={cn("absolute bottom-0", resolvedSide === "left" ? "left-0" : "right-0")}
         initial={false}
         animate={isMenuOpen ? { rotate: 45, y: [0, -5, 0] } : { rotate: 0, y: [0, -5, 0] }}
         transition={{
